@@ -10,12 +10,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function Login() {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuthStore();
+  const { user, profile, signOut, fetchProfile } = useAuthStore();
+  const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'shravpconnect@gmail.com';
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'student' | 'trainer'>('student');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +45,7 @@ export function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const { error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }));
       if (error) setError(error.message);
@@ -55,6 +60,7 @@ export function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const { error } = await withTimeout(supabase.auth.signUp({
         email,
@@ -67,7 +73,73 @@ export function Login() {
         },
       }));
       if (error) setError(error.message);
-      else setError('Success! Check your email for the confirmation link, or try logging in if email confirmation is disabled.');
+      else setSuccess('Success! Check your email for the confirmation link, or try logging in if email confirmation is disabled.');
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendSuperAdminOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const { error } = await withTimeout(supabase.auth.signInWithOtp({
+        email: superAdminEmail,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: window.location.origin,
+        },
+      }));
+      if (error) {
+        setError(error.message);
+      } else {
+        setOtpSent(true);
+        setSuccess(`OTP sent to ${superAdminEmail}. Enter the code to continue.`);
+      }
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifySuperAdminOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const { data, error } = await withTimeout(supabase.auth.verifyOtp({
+        email: superAdminEmail,
+        token: otp,
+        type: 'email',
+      }));
+
+      if (error) {
+        setError(error.message);
+      } else {
+        const verifiedUser = data?.user;
+        if (verifiedUser?.id) {
+          const { error: profileError } = await withTimeout(
+            supabase
+              .from('users')
+              .update({ role: 'super_admin', status: 'active' })
+              .eq('id', verifiedUser.id)
+          );
+
+          if (profileError) {
+            setError(`OTP verified, but role update failed: ${profileError.message}`);
+          } else {
+            await fetchProfile(verifiedUser.id);
+            setSuccess('Super Admin login successful. Redirecting...');
+            navigate('/');
+          }
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
     } finally {
@@ -78,6 +150,7 @@ export function Login() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const { error } = await withTimeout(supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -131,9 +204,10 @@ export function Login() {
           </div>
         )}
         <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
+            <TabsTrigger value="superadmin">Super Admin</TabsTrigger>
           </TabsList>
           <TabsContent value="login">
             <form onSubmit={handleLogin}>
@@ -159,6 +233,7 @@ export function Login() {
                   <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
+                {success && <p className="text-sm text-green-600">{success}</p>}
               </CardContent>
               <CardFooter>
                 <Button className="w-full" type="submit" disabled={loading}>
@@ -208,11 +283,50 @@ export function Login() {
                   </div>
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
+                {success && <p className="text-sm text-green-600">{success}</p>}
               </CardContent>
               <CardFooter>
                 <Button className="w-full" type="submit" disabled={loading}>
                   {loading ? 'Registering...' : 'Register'}
                 </Button>
+              </CardFooter>
+            </form>
+          </TabsContent>
+          <TabsContent value="superadmin">
+            <form onSubmit={otpSent ? handleVerifySuperAdminOtp : handleSendSuperAdminOtp}>
+              <CardContent className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="super-admin-email">Super Admin Email</Label>
+                  <Input id="super-admin-email" type="email" value={superAdminEmail} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="super-admin-otp">OTP Code</Label>
+                  <Input
+                    id="super-admin-otp"
+                    type="text"
+                    placeholder="Enter OTP"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    disabled={!otpSent}
+                    required={otpSent}
+                  />
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                {success && <p className="text-sm text-green-600">{success}</p>}
+              </CardContent>
+              <CardFooter className="flex gap-2">
+                <Button className="w-full" type="button" variant="outline" onClick={() => setOtpSent(false)} disabled={loading || !otpSent}>
+                  Reset
+                </Button>
+                {!otpSent ? (
+                  <Button className="w-full" type="submit" disabled={loading}>
+                    {loading ? 'Sending OTP...' : 'Send OTP'}
+                  </Button>
+                ) : (
+                  <Button className="w-full" type="submit" disabled={loading || !otp}>
+                    {loading ? 'Verifying...' : 'Verify OTP'}
+                  </Button>
+                )}
               </CardFooter>
             </form>
           </TabsContent>
