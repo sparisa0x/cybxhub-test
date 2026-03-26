@@ -12,6 +12,7 @@ export function Login() {
   const navigate = useNavigate();
   const { user, profile, signOut, fetchProfile } = useAuthStore();
   const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'shravpconnect@gmail.com';
+  const allowSuperAdminBootstrap = import.meta.env.VITE_ALLOW_SUPER_ADMIN_BOOTSTRAP === 'true';
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,7 +91,7 @@ export function Login() {
       const { error } = await withTimeout(supabase.auth.signInWithOtp({
         email: superAdminEmail,
         options: {
-          shouldCreateUser: true,
+          shouldCreateUser: allowSuperAdminBootstrap,
           emailRedirectTo: window.location.origin,
         },
       }));
@@ -115,7 +116,7 @@ export function Login() {
     try {
       const { data, error } = await withTimeout(supabase.auth.verifyOtp({
         email: superAdminEmail,
-        token: otp,
+        token: otp.trim(),
         type: 'email',
       }));
 

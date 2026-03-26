@@ -28,6 +28,18 @@ $$;
 
 create extension if not exists "uuid-ossp";
 
+alter table public.users
+  alter column name set default 'User';
+
+update public.users
+set name = coalesce(nullif(trim(name), ''), 'User')
+where name is null or trim(name) = '';
+
+alter table public.users
+  alter column name set not null,
+  alter column role set not null,
+  alter column status set not null;
+
 create table if not exists public.batch_join_requests (
   id uuid default uuid_generate_v4() primary key,
   batch_id uuid references public.batches(id) on delete cascade not null,
@@ -260,14 +272,29 @@ create policy "Active users can create announcements" on public.announcements
 
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  normalized_role text;
+  derived_name text;
 begin
+  normalized_role := lower(coalesce(new.raw_user_meta_data->>'role', 'student'));
+  if normalized_role not in ('admin', 'super_admin', 'trainer', 'student') then
+    normalized_role := 'student';
+  end if;
+
+  derived_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+    nullif(trim(new.raw_user_meta_data->>'name'), ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'User'
+  );
+
   insert into public.users (id, email, name, role, status)
   values (
     new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Unknown User'),
-    coalesce(new.raw_user_meta_data->>'role', 'student'),
-    case when coalesce(new.raw_user_meta_data->>'role', 'student') in ('admin', 'super_admin') then 'active' else 'pending' end
+    coalesce(new.email, ''),
+    derived_name,
+    normalized_role,
+    case when normalized_role = 'super_admin' then 'active' else 'pending' end
   )
   on conflict (id) do update
     set email = excluded.email,
@@ -276,7 +303,7 @@ begin
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

@@ -5,9 +5,9 @@ create extension if not exists "uuid-ossp";
 create table public.users (
   id uuid references auth.users on delete cascade not null primary key,
   email text not null,
-  name text,
-  role text check (role in ('admin', 'super_admin', 'trainer', 'student')) default 'student',
-  status text check (status in ('pending', 'active', 'suspended')) default 'pending',
+  name text not null default 'User',
+  role text not null check (role in ('admin', 'super_admin', 'trainer', 'student')) default 'student',
+  status text not null check (status in ('pending', 'active', 'suspended')) default 'pending',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -267,19 +267,40 @@ create policy "Active users can create announcements" on public.announcements
 -- Trigger to automatically create a user profile when a new user signs up
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  normalized_role text;
+  derived_name text;
 begin
+  normalized_role := lower(coalesce(new.raw_user_meta_data->>'role', 'student'));
+  if normalized_role not in ('admin', 'super_admin', 'trainer', 'student') then
+    normalized_role := 'student';
+  end if;
+
+  derived_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+    nullif(trim(new.raw_user_meta_data->>'name'), ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'User'
+  );
+
   insert into public.users (id, email, name, role, status)
   values (
     new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Unknown User'),
-    coalesce(new.raw_user_meta_data->>'role', 'student'),
-    case when coalesce(new.raw_user_meta_data->>'role', 'student') in ('admin', 'super_admin') then 'active' else 'pending' end
-  );
+    coalesce(new.email, ''),
+    derived_name,
+    normalized_role,
+    case when normalized_role = 'super_admin' then 'active' else 'pending' end
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        name = excluded.name,
+        role = excluded.role;
+
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
