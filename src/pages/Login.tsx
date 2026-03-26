@@ -96,7 +96,11 @@ export function Login() {
         },
       }));
       if (error) {
-        setError(error.message);
+        if (error.message.toLowerCase().includes('signups not allowed for otp')) {
+          setError('Supabase blocked OTP signup. Enable Email signups temporarily in Supabase Auth settings, send OTP once to create the account, then disable signup again if needed.');
+        } else {
+          setError(error.message);
+        }
       } else {
         setOtpSent(true);
         setSuccess(`OTP sent to ${superAdminEmail}. Enter the code to continue.`);
