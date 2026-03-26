@@ -12,7 +12,7 @@ export function Users() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (profile?.role === 'admin' || profile?.role === 'super_admin') {
+    if (profile?.role === 'super_admin') {
       fetchUsers();
     }
   }, [profile]);
@@ -30,17 +30,27 @@ export function Users() {
     }
   };
 
-  const handleApproveTrainer = async (userId: string) => {
+  const handleApproveUser = async (userId: string) => {
     try {
       const { error } = await supabase.from('users').update({ status: 'active' }).eq('id', userId);
       if (error) throw error;
       setUsers(users.map(u => u.id === userId ? { ...u, status: 'active' } : u));
     } catch (error) {
-      console.error('Error approving trainer:', error);
+      console.error('Error approving user:', error);
     }
   };
 
-  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
+  const handleRejectUser = async (userId: string) => {
+    try {
+      const { error } = await supabase.from('users').update({ status: 'suspended' }).eq('id', userId);
+      if (error) throw error;
+      setUsers(users.map(u => u.id === userId ? { ...u, status: 'suspended' } : u));
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+    }
+  };
+
+  if (profile?.role !== 'super_admin') {
     return <div>Access Denied</div>;
   }
 
@@ -95,12 +105,12 @@ export function Users() {
                       </Badge>
                     </div>
                     <div className="text-right">
-                      {user.role === 'trainer' && user.status === 'pending' && (
+                      {user.status === 'pending' && user.role !== 'super_admin' && (
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleApproveTrainer(user.id)}>
+                          <Button size="sm" variant="outline" onClick={() => handleApproveUser(user.id)}>
                             <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Approve
                           </Button>
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => handleRejectUser(user.id)}>
                             <XCircle className="mr-2 h-4 w-4 text-red-500" /> Reject
                           </Button>
                         </div>

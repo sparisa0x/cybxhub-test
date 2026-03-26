@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ export function Resources() {
     }
   };
 
-  const handleCreateResource = async (e: React.FormEvent) => {
+  const handleCreateResource = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const tagsArray = newResource.tags.split(',').map(tag => tag.trim()).filter(Boolean);

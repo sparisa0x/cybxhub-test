@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,9 @@ import { Users, Plus } from 'lucide-react';
 export function Batches() {
   const { profile } = useAuthStore();
   const [batches, setBatches] = useState<any[]>([]);
+  const [availableBatches, setAvailableBatches] = useState<any[]>([]);
+  const [studentRequests, setStudentRequests] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newBatch, setNewBatch] = useState({ name: '', description: '', start_date: '' });
@@ -23,26 +26,52 @@ export function Batches() {
   const fetchBatches = async () => {
     setLoading(true);
     try {
-      let query = supabase.from('batches').select('*, trainer:users(name)');
-      
+      let query = supabase.from('batches').select('*, trainer:users(name, id)');
+
       if (profile?.role === 'trainer') {
         query = query.eq('trainer_id', profile.id);
       } else if (profile?.role === 'student') {
-        // Students see batches they are enrolled in
+        const { data: allBatches, error: allBatchesError } = await supabase
+          .from('batches')
+          .select('*, trainer:users(name, id)');
+        if (allBatchesError) throw allBatchesError;
+
         const { data: enrollments } = await supabase.from('batch_students').select('batch_id').eq('student_id', profile.id);
-        const batchIds = enrollments?.map(e => e.batch_id) || [];
-        if (batchIds.length > 0) {
-          query = query.in('id', batchIds);
-        } else {
-          setBatches([]);
-          setLoading(false);
-          return;
-        }
+        const enrolledBatchIds = new Set((enrollments || []).map(e => e.batch_id));
+
+        const { data: requests, error: requestsError } = await supabase
+          .from('batch_join_requests')
+          .select('id, batch_id, status')
+          .eq('student_id', profile.id);
+        if (requestsError) throw requestsError;
+
+        setStudentRequests(requests || []);
+        setBatches((allBatches || []).filter(batch => enrolledBatchIds.has(batch.id)));
+        setAvailableBatches((allBatches || []).filter(batch => !enrolledBatchIds.has(batch.id)));
+        setLoading(false);
+        return;
       }
 
       const { data, error } = await query;
       if (error) throw error;
       setBatches(data || []);
+
+      if (profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'trainer') {
+        const { data: requestRows, error: requestError } = await supabase
+          .from('batch_join_requests')
+          .select('id, batch_id, student_id, status, created_at, batch:batches(id, name, trainer_id), student:users(id, name, email)')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        if (requestError) throw requestError;
+
+        const filteredRequests = profile.role === 'trainer'
+          ? (requestRows || []).filter((row: any) => row.batch?.trainer_id === profile.id)
+          : (requestRows || []);
+
+        setPendingRequests(filteredRequests);
+      } else {
+        setPendingRequests([]);
+      }
     } catch (error) {
       console.error('Error fetching batches:', error);
     } finally {
@@ -50,7 +79,54 @@ export function Batches() {
     }
   };
 
-  const handleCreateBatch = async (e: React.FormEvent) => {
+  const handleRequestJoin = async (batchId: string) => {
+    if (!profile) return;
+
+    try {
+      const { error } = await supabase
+        .from('batch_join_requests')
+        .insert([{ batch_id: batchId, student_id: profile.id }]);
+
+      if (error) throw error;
+      await fetchBatches();
+    } catch (error) {
+      console.error('Error requesting batch join:', error);
+    }
+  };
+
+  const handleReviewRequest = async (
+    requestId: string,
+    batchId: string,
+    studentId: string,
+    status: 'approved' | 'rejected'
+  ) => {
+    try {
+      if (status === 'approved') {
+        const { error: enrollmentError } = await supabase
+          .from('batch_students')
+          .upsert([{ batch_id: batchId, student_id: studentId }], { onConflict: 'batch_id,student_id' });
+
+        if (enrollmentError) throw enrollmentError;
+      }
+
+      const { error: requestError } = await supabase
+        .from('batch_join_requests')
+        .update({ status })
+        .eq('id', requestId);
+
+      if (requestError) throw requestError;
+
+      await fetchBatches();
+    } catch (error) {
+      console.error('Error reviewing batch join request:', error);
+    }
+  };
+
+  const getStudentRequestStatus = (batchId: string) => {
+    return studentRequests.find(request => request.batch_id === batchId)?.status;
+  };
+
+  const handleCreateBatch = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const { data, error } = await supabase.from('batches').insert([
@@ -139,6 +215,86 @@ export function Batches() {
             </Card>
           ))}
         </div>
+      )}
+
+      {profile?.role === 'student' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Available Batches</CardTitle>
+            <CardDescription>Request to join a batch after your account is approved.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {availableBatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No available batches to join right now.</p>
+            ) : (
+              availableBatches.map((batch) => {
+                const requestStatus = getStudentRequestStatus(batch.id);
+                return (
+                  <div key={batch.id} className="flex items-center justify-between rounded-md border p-4">
+                    <div>
+                      <p className="font-medium">{batch.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Starts: {new Date(batch.start_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={requestStatus === 'pending' ? 'secondary' : 'default'}
+                      disabled={requestStatus === 'pending' || requestStatus === 'approved'}
+                      onClick={() => handleRequestJoin(batch.id)}
+                    >
+                      {requestStatus === 'pending'
+                        ? 'Requested'
+                        : requestStatus === 'approved'
+                          ? 'Approved'
+                          : 'Request Join'}
+                    </Button>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {(profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'trainer') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Join Requests</CardTitle>
+            <CardDescription>Review student requests to join batches.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {pendingRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No pending requests.</p>
+            ) : (
+              pendingRequests.map((request: any) => (
+                <div key={request.id} className="flex items-center justify-between rounded-md border p-4">
+                  <div>
+                    <p className="font-medium">{request.student?.name || 'Student'}</p>
+                    <p className="text-xs text-muted-foreground">{request.student?.email}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Batch: {request.batch?.name || 'Unknown'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleReviewRequest(request.id, request.batch_id, request.student_id, 'approved')}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleReviewRequest(request.id, request.batch_id, request.student_id, 'rejected')}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

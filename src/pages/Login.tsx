@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
@@ -41,7 +41,7 @@ export function Login() {
     return Promise.race([promise, timeout]);
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -56,7 +56,7 @@ export function Login() {
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -81,7 +81,7 @@ export function Login() {
     }
   };
 
-  const handleSendSuperAdminOtp = async (e: React.FormEvent) => {
+  const handleSendSuperAdminOtp = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -107,7 +107,7 @@ export function Login() {
     }
   };
 
-  const handleVerifySuperAdminOtp = async (e: React.FormEvent) => {
+  const handleVerifySuperAdminOtp = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -124,12 +124,18 @@ export function Login() {
       } else {
         const verifiedUser = data?.user;
         if (verifiedUser?.id) {
-          const { error: profileError } = await withTimeout(
-            supabase
-              .from('users')
-              .update({ role: 'super_admin', status: 'active' })
-              .eq('id', verifiedUser.id)
-          );
+          const { error: profileError } = await supabase
+            .from('users')
+            .upsert(
+              [{
+                id: verifiedUser.id,
+                email: verifiedUser.email || superAdminEmail,
+                name: verifiedUser.user_metadata?.full_name || 'Super Admin',
+                role: 'super_admin',
+                status: 'active',
+              }],
+              { onConflict: 'id' }
+            );
 
           if (profileError) {
             setError(`OTP verified, but role update failed: ${profileError.message}`);

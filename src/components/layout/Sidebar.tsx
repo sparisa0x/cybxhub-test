@@ -22,7 +22,7 @@ export function Sidebar() {
     { name: 'Assignments', href: '/assignments', icon: FileText, roles: ['admin', 'super_admin', 'trainer', 'student'] },
     { name: 'Attendance', href: '/attendance', icon: CheckSquare, roles: ['admin', 'super_admin', 'trainer', 'student'] },
     { name: 'Announcements', href: '/announcements', icon: Megaphone, roles: ['admin', 'super_admin', 'trainer', 'student'] },
-    { name: 'Users', href: '/users', icon: Users, roles: ['admin', 'super_admin'] },
+    { name: 'Users', href: '/users', icon: Users, roles: ['super_admin'] },
     { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin', 'super_admin', 'trainer', 'student'] },
   ];
 

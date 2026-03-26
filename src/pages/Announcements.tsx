@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ export function Announcements() {
     }
   };
 
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+  const handleCreateAnnouncement = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const { data, error } = await supabase.from('announcements').insert([
