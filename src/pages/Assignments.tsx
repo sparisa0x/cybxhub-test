@@ -20,7 +20,7 @@ export function Assignments() {
 
   useEffect(() => {
     fetchAssignments();
-    if (profile?.role === 'trainer' || profile?.role === 'admin') {
+    if (profile?.role === 'trainer' || profile?.role === 'admin' || profile?.role === 'super_admin') {
       fetchBatches();
     }
   }, [profile]);
@@ -92,7 +92,7 @@ export function Assignments() {
           <h1 className="text-3xl font-bold tracking-tight">Assignments</h1>
           <p className="text-muted-foreground">Manage tasks and submissions.</p>
         </div>
-        {(profile?.role === 'admin' || profile?.role === 'trainer') && (
+        {(profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'trainer') && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Create Assignment</Button>

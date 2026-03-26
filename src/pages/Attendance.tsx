@@ -46,7 +46,7 @@ export function Attendance() {
           <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
           <p className="text-muted-foreground">Track and manage batch attendance.</p>
         </div>
-        {(profile?.role === 'admin' || profile?.role === 'trainer') && (
+        {(profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'trainer') && (
           <Button><CheckSquare className="mr-2 h-4 w-4" /> Mark Attendance</Button>
         )}
       </div>

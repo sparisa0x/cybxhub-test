@@ -82,7 +82,7 @@ export function Resources() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          {(profile?.role === 'admin' || profile?.role === 'trainer') && (
+          {(profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'trainer') && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button><Plus className="mr-2 h-4 w-4" /> Add Link</Button>

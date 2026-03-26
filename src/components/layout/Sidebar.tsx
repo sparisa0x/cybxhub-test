@@ -16,14 +16,14 @@ export function Sidebar() {
   const { profile } = useAuthStore();
 
   const navItems = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'trainer', 'student'] },
-    { name: 'Batches', href: '/batches', icon: Users, roles: ['admin', 'trainer', 'student'] },
-    { name: 'Resources', href: '/resources', icon: BookOpen, roles: ['admin', 'trainer', 'student'] },
-    { name: 'Assignments', href: '/assignments', icon: FileText, roles: ['admin', 'trainer', 'student'] },
-    { name: 'Attendance', href: '/attendance', icon: CheckSquare, roles: ['admin', 'trainer', 'student'] },
-    { name: 'Announcements', href: '/announcements', icon: Megaphone, roles: ['admin', 'trainer', 'student'] },
-    { name: 'Users', href: '/users', icon: Users, roles: ['admin'] },
-    { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin', 'trainer', 'student'] },
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'super_admin', 'trainer', 'student'] },
+    { name: 'Batches', href: '/batches', icon: Users, roles: ['admin', 'super_admin', 'trainer', 'student'] },
+    { name: 'Resources', href: '/resources', icon: BookOpen, roles: ['admin', 'super_admin', 'trainer', 'student'] },
+    { name: 'Assignments', href: '/assignments', icon: FileText, roles: ['admin', 'super_admin', 'trainer', 'student'] },
+    { name: 'Attendance', href: '/attendance', icon: CheckSquare, roles: ['admin', 'super_admin', 'trainer', 'student'] },
+    { name: 'Announcements', href: '/announcements', icon: Megaphone, roles: ['admin', 'super_admin', 'trainer', 'student'] },
+    { name: 'Users', href: '/users', icon: Users, roles: ['admin', 'super_admin'] },
+    { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin', 'super_admin', 'trainer', 'student'] },
   ];
 
   const filteredNavItems = navItems.filter(item => 

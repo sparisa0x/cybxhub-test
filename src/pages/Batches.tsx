@@ -78,7 +78,7 @@ export function Batches() {
           <h1 className="text-3xl font-bold tracking-tight">Batches</h1>
           <p className="text-muted-foreground">Manage your training cohorts.</p>
         </div>
-        {(profile?.role === 'admin' || profile?.role === 'trainer') && (
+        {(profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'trainer') && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Create Batch</Button>

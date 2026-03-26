@@ -12,7 +12,7 @@ export function Users() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (profile?.role === 'admin') {
+    if (profile?.role === 'admin' || profile?.role === 'super_admin') {
       fetchUsers();
     }
   }, [profile]);
@@ -40,7 +40,7 @@ export function Users() {
     }
   };
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
     return <div>Access Denied</div>;
   }
 

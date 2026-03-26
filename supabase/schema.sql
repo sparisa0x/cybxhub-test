@@ -6,7 +6,7 @@ create table public.users (
   id uuid references auth.users on delete cascade not null primary key,
   email text not null,
   name text,
-  role text check (role in ('admin', 'trainer', 'student')) default 'student',
+  role text check (role in ('admin', 'super_admin', 'trainer', 'student')) default 'student',
   status text check (status in ('pending', 'active', 'suspended')) default 'pending',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -114,7 +114,7 @@ begin
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Unknown User'),
     coalesce(new.raw_user_meta_data->>'role', 'student'),
-    case when coalesce(new.raw_user_meta_data->>'role', 'student') = 'student' then 'active' else 'pending' end
+    case when coalesce(new.raw_user_meta_data->>'role', 'student') in ('student', 'admin', 'super_admin') then 'active' else 'pending' end
   );
   return new;
 end;
